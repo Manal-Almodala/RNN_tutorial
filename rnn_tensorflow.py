@@ -11,6 +11,7 @@ import tensorflow as tf
 
 #nltk.download("book")
 
+BATCH_SIZE = 100
 vocabulary_size = 8000
 unknown_token = "UNKNOWN_TOKEN"
 sentence_start_token = "SENTENCE_START"
@@ -64,15 +65,38 @@ print "\ny:\n%s\n%s" % (" ".join([index_to_word[x] for x in y_example]), y_examp
 hidden_dim = 100
 vocab_size = 8000
 
+# define tensor shape
+#train_image.set_shape([IMAGE_HEIGHT, IMAGE_WIDTH, NUM_CHANNELS])
+#test_image.set_shape([IMAGE_HEIGHT, IMAGE_WIDTH, NUM_CHANNELS])
 
-#tf.interactiveSession()
+
+# collect batches of images before processing
+#X, Y = tf.train.batch([X_train, y_train], batch_size=BATCH_SIZE)
+
+def split_list(alist, wanted_parts=1):
+    length = len(alist)
+    return [ alist[i*length // wanted_parts: (i+1)*length // wanted_parts] 
+             for i in range(wanted_parts) ]
 
 
-X = X_train
-Y = y_train
+#X_batch = split_list(list(X_train), 70000)
+#Y_batch = split_list(list(y_train), 70000)
+#X=X_batch[0]
+#Y=Y_batch[0]
+
+X=X_train
+Y=y_train
+
+
+import time
+
+start = time.time()
 
 graph = tf.Graph()
 with graph.as_default():
+
+	#X = tf.placeholder(tf.float32, [None, vocab_size])
+	#Y = tf.placeholder(tf.float32, [None, vocab_size])
 
 	#Parameters
 	U = tf.Variable(tf.truncated_normal([vocab_size, hidden_dim], -0.1, 0.1)) #(8000,100)
@@ -125,14 +149,14 @@ with graph.as_default():
 	
 	outputs = []
 
-	for senten_i in xrange(len(Y[:10])):
+	for senten_i in xrange(len(Y)):
 		_, output_prob = forward_propagation(X[senten_i])
 		outputs.append(tf.squeeze(output_prob))
 		# shape of output_prob = (sentence_length, vocab_size) 
 	logits = tf.concat(outputs, 0) # shape=(number_of_words, 8000)
 
 	train_label = []
-	for labels_i in xrange(len(Y[:10])):
+	for labels_i in xrange(len(Y)):
 		one_hot_label = tf.nn.embedding_lookup(np.eye(vocab_size), Y[labels_i])
 		one_hot_label = tf.reshape(one_hot_label, [int(one_hot_label.shape[0]), vocab_size, 1])
 		train_label.append(tf.squeeze(one_hot_label))    
@@ -160,7 +184,11 @@ with graph.as_default():
 
 	# Predictions.
 	train_prediction = tf.nn.softmax(logits)
-	
+
+
+
+end = time.time()
+print(end - start)
 
 ###########################################################################################
 # Session starts!
@@ -172,12 +200,13 @@ with tf.Session(graph=graph) as session:
   tf.global_variables_initializer().run()
   print('Initialized')
   mean_loss = 0
+  i=0
   for step in range(num_steps):
-    feed_dict = {X:X , Y:Y}
-    for i in range(num_unrollings + 1):
-      feed_dict[train_data[i]] = batches[i] # Key: shape=(64, 128), Value: (64, 27)
-    _, l, predictions, lr = session.run(
-      [optimizer, loss, train_prediction, learning_rate], feed_dict=feed_dict)
+    #X=X_batch[i]
+    #Y=Y_batch[i]
+    i+=1
+    feed_dict = {'X':X, 'Y':Y}
+    _, l, predictions, lr = session.run([optimizer, loss, train_prediction, learning_rate], feed_dict=feed_dict)
     mean_loss += l
     if step % summary_frequency == 0:
       if step > 0:
